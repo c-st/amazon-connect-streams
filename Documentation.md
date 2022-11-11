@@ -5,11 +5,11 @@
 Note that routability in streams is only affected by agent statuses. Voice contacts will change the agent status, and thus can affect routability. Task and chat contacts do not affect routability. However, if the other channels hit their concurrent live contact limit(s), the agent will not be routed more contacts, but they will technically be in a routable agent state.
 
 # Usage
-amazon-connect-streams is available from [npmjs.com](https://www.npmjs.com/package/amazon-connect-streams). If you'd like to download it here, you can use either of the files like `release/connect-streams*`. 
+amazon-connect-streams is available from [npmjs.com](https://www.npmjs.com/package/amazon-connect-streams). If you'd like to download it here, you can use either of the files like `release/connect-streams*`.
 
-Run `npm run release` to generate new release files. Full instructions for building locally with npm can be found [below](#build-your-own-with-npm). 
+Run `npm run release` to generate new release files. Full instructions for building locally with npm can be found [below](#build-your-own-with-npm).
 
-In version 1.x, we also support `make` for legacy builds. This option was removed in version 2.x. 
+In version 1.x, we also support `make` for legacy builds. This option was removed in version 2.x.
 
 # Important Announcements
 1. August 2022 - 2.3.0
@@ -19,22 +19,22 @@ In version 1.x, we also support `make` for legacy builds. This option was remove
     * `agent.onContactPending` has been removed. Please use `contact.onPending` instead. `connect.onError` now triggers. Previously, this api did not work at all. Please be aware that, if you have application logic within this function, its behavior has changed. See its entry in documentation.md for more details.
 1. September 2021 - 1.7.0 comes with changes needed to use Amazon Connect Voice ID, which launched on 9/27/2021. For customers who want to use Voice ID, please upgrade Streams to version 1.7.0 or later in the next 1 month, otherwise the Voice ID APIs will stop working by the end of October 2021. For more details on the Voice ID APIs, please look at [the Voice ID APIs section](Documentation.md#voice-id-apis).
 1. July 2021 - We released a change to the CCP that lets agent set a next status such as Lunch or Offline while still on a contact, and indicate they don’t want to be routed new contacts while they finish up their remaining work.  For more details on this feature, see the [Amazon Connect agent training guide](https://docs.aws.amazon.com/connect/latest/adminguide/set-next-status.html) and the feature's [release notes](https://docs.aws.amazon.com/connect/latest/adminguide/amazon-connect-release-notes.html#july21-release-notes). If your agents interact directly with Connect’s out-of-the-box CCPV2 UX, they will be able to access this feature by default. Otherwise, if your streamsJS application calls `agent.setState()` to switch agent status, you will need to update your code to use this feature:
-    *  **Agent.setState()** has been updated so you can pass an optional flag `enqueueNextState: true` to trigger the Next Status behavior. 
+    *  **Agent.setState()** has been updated so you can pass an optional flag `enqueueNextState: true` to trigger the Next Status behavior.
     * A new **agent.onEnqueuedNextState()** listener lets you subscribe to events for when agents have selected/successfully enqueued their next status.
-    * A new **agent.getNextState()** API returns a state object if the agent has successfully selected a next state, and null otherwise. 
+    * A new **agent.getNextState()** API returns a state object if the agent has successfully selected a next state, and null otherwise.
     * If you want to use the Next Status feature via `agent.setState()`, please also ensure that your code is using `contact.clear()` and not `contact.complete()` when clearing After Contact Work off a contact.
 1. December 2020 —  1.6.0 brings with it the release of a new Agent App API. In addition to the CCP, customers can now embed additional applications using connect.agentApp, including Customer Profiles and Wisdom. See the [updated documentation](Documentation.md#initialization-for-ccp-customer-profiles-and-wisdom) for details on usage. We are also introducing a preview release for Amazon Connect Voice ID.
     * ### About Amazon Connect Customer Profiles
-        + Amazon Connect Customer Profiles provides pre-built integrations so you can quickly combine customer information from multiple external applications, with contact history from Amazon Connect. This allows you to create a customer profile that has all the information agents need during customer interactions in a single place. 
+        + Amazon Connect Customer Profiles provides pre-built integrations so you can quickly combine customer information from multiple external applications, with contact history from Amazon Connect. This allows you to create a customer profile that has all the information agents need during customer interactions in a single place.
     * ### About Amazon Connect Wisdom
         + With Amazon Connect Wisdom, agents can search and find content across multiple repositories, such as frequently asked questions (FAQs), wikis, articles, and step-by-step instructions for handling different customer issues. They can type questions or phrases in a search box (such as, "how long after purchase can handbags be exchanged?") without having to guess which keywords will work.
     * ### About Amazon Connect Voice ID (The feature is in preview release for Amazon Connect and is subject to change)
         + Amazon Connect Voice ID provides real-time caller authentication which makes voice interactions in contact centers more secure and efficient. Voice ID uses machine learning to verify the identity of genuine customers by analyzing a caller’s unique voice characteristics. This allows contact centers to use an additional security layer that doesn’t rely on the caller answering multiple security questions, and makes it easy to enroll and verify customers without changing the natural flow of their conversation.
-1. July 2020 -- We recently changed the new, omnichannel, CCP's behavior when it encounters three voice-only agent states: `FailedConnectAgent`, `FailedConnectCustomer`, and `AfterCallWork`. 
-    * `FailedConnectAgent` -- Previously, we required the agent to click the "Clear Contact" button to clear this state. When the agent clicked the "Clear Contact" button, the previous behavior took the agent back to the `Available` state without fail. Now the `FailedConnectAgent` state will be "auto-cleared", much like `FailedConnectCustomer` always has been. 
+1. July 2020 -- We recently changed the new, omnichannel, CCP's behavior when it encounters three voice-only agent states: `FailedConnectAgent`, `FailedConnectCustomer`, and `AfterCallWork`.
+    * `FailedConnectAgent` -- Previously, we required the agent to click the "Clear Contact" button to clear this state. When the agent clicked the "Clear Contact" button, the previous behavior took the agent back to the `Available` state without fail. Now the `FailedConnectAgent` state will be "auto-cleared", much like `FailedConnectCustomer` always has been.
     * `FailedConnectAgent` and `FailedConnectCustomer` -- We are now using the `contact.clear()` API to auto-clear these states. As a result, the agent will be returned to their previous visible agent state (e.g. `Available`). Previously, the agent had always been set to `Available` as a result of this "auto-clearing" behavior. Note that even custom CCPs will behave differently with this update for `FailedConnectAgent` and `FailedConnectCustomer`.
     * `AfterCallWork` -- As part of the new `contact.clear()` behavior, clicking "Clear Contact" while in `AfterCallWork` will return the agent to their previous visible agent state (e.g. `Available`, etc.). Note that custom CCPs that implement their own After Call Work behavior will not be affected by this change.
-        * We are putting `contact.complete()` on a deprecation path. Therefore, you should start using `contact.clear()` in its place. If you want to emulate CCP's After Call Work behavior in your customer CCP, then make sure you use `contact.clear()` when clearing voice contacts. 
+        * We are putting `contact.complete()` on a deprecation path. Therefore, you should start using `contact.clear()` in its place. If you want to emulate CCP's After Call Work behavior in your customer CCP, then make sure you use `contact.clear()` when clearing voice contacts.
 
 ## Overview
 The Amazon Connect Streams API (Streams) gives you the power to integrate your existing web applications with Amazon Connect.  Streams lets you embed the Contact Control Panel (CCP) and Customer Profiles app UI into your page.  It also enables you to handle agent and contact state events directly through an object oriented event driven interface.  You can use the built in interface or build your own from scratch: Streams gives you the choice.
@@ -137,7 +137,7 @@ $ npm run test-mocha
 ```
 Note: these tests run on the release files generated above
 
-### Instructions for Streams version 1.x: 
+### Instructions for Streams version 1.x:
 You will also need to have `gulp` installed. You can install `gulp` globally.
 
 ```
@@ -199,7 +199,7 @@ everything set up correctly and that you are able to listen for events.
           },
           pageOptions: { //optional
             enableAudioDeviceSettings: false, //optional, defaults to 'false'
-            enablePhoneTypeSettings: true //optional, defaults to 'true' 
+            enablePhoneTypeSettings: true //optional, defaults to 'true'
           },
           shouldAddNamespaceToLogs: false, //optional, defaults to 'false'
           ccpAckTimeout: 5000, //optional, defaults to 3000 (ms)
@@ -219,7 +219,7 @@ and made available to your JS client code.
   in order to use the CCP in a standalone page, it is different for each
   instance.
 * `region`: Amazon connect instance region. ex: `us-west-2`. only required for chat channel.
-* `loginPopup`: Optional, defaults to `true`.  Set to `false` to disable the login popup   
+* `loginPopup`: Optional, defaults to `true`.  Set to `false` to disable the login popup
    which is shown when the user's authentication expires.
 * `loginOptions`: Optional, only valid when `loginPopup` is set to `true`.
    Provide an object with the following properties to open loginpopup in a new window instead of a
@@ -230,7 +230,7 @@ and made available to your JS client code.
    * `width`: This allows you to define the width of the login pop-up window.
    * `top`: This allows you to define the top of the login pop-up window.
    * `left`: This allows you to define the left of the login pop-up window.
-* `loginPopupAutoClose`: Optional, defaults to `false`. Set to `true` in conjunction with the 
+* `loginPopupAutoClose`: Optional, defaults to `false`. Set to `true` in conjunction with the
    `loginPopup` parameter to automatically close the login Popup window once the authentication step
    has completed. If the login page opened in a new tab, this parameter will also auto-close that
    tab. This can also be set in `loginOptions` if those options are used.
@@ -256,8 +256,9 @@ and made available to your JS client code.
       and deskphone number. If `false`, the agent will not be able to change the phone type or deskphone number from the settings tab.
 * `shouldAddNamespaceToLogs`: prepends `[CCP]` to all logs logged by the CCP. Important note: there are a few logs made by the CCP before the namespace is prepended.
 * `ccpAckTimeout`: A timeout in ms that indicates how long streams will wait for the iframed CCP to respond to its `SYNCHRONIZE` event emissions. These happen continuously from the first time `initCCP` is called. They should only appear when there is a problem that requires a refresh or a re-login.
-* `ccpSynTimeout`: A timeout in ms that indicates how long streams will wait to send a new `SYNCHRONIZE` event to the iframed CCP. These happens continuously from the first time `initCCP` is called. 
+* `ccpSynTimeout`: A timeout in ms that indicates how long streams will wait to send a new `SYNCHRONIZE` event to the iframed CCP. These happens continuously from the first time `initCCP` is called.
 * `ccpLoadTimeout`: A timeout in ms that indicates how long streams will wait for the initial `ACKNOWLEDGE` event from the shared worker while the CCP is still standing itself up.
+* `ccpIframeRefreshInterval`: A timeout in ms that indicates how long streams will wait between iFrame reloads.
 
 #### A few things to note:
 * You have the option to show or hide the pre-built UI by showing or hiding the
@@ -360,7 +361,7 @@ More precisely, `onViewContact` is called in the below scenarios:
     1. CCP will call `onViewContact` with the next contact in the list of contacts
 3. A contact has been selected as the active contact in CCP. This can happen in multiple ways
     1. An agent clicks on that contact’s tab in native or embedded CCP
-    2. CCP will trigger `onViewContact` when the close contact button is clicked in native or embedded CCP. CCP will call `onViewContact` with the next contact in the list of contacts. Note that this is redundant with scenario 2 and will result in `onViewContact` being called twice. 
+    2. CCP will trigger `onViewContact` when the close contact button is clicked in native or embedded CCP. CCP will call `onViewContact` with the next contact in the list of contacts. Note that this is redundant with scenario 2 and will result in `onViewContact` being called twice.
 4. A new contact has been accepted using the accept contact button in native or embedded CCP
 5. `connect.core.viewContact` is called in your custom implementation
 6. There are some cases when `onViewContact` is called with an empty string. This denotes that the active contact has been unset. That happens in the following scenarios:
@@ -386,7 +387,7 @@ connect.core.onSoftphoneSessionInit(function({ connectionId }) {
   var softphoneManager = connect.core.getSoftphoneManager();
   if(softphoneManager){
     // access session
-    var session = softphoneManager.getSession(connectionId); 
+    var session = softphoneManager.getSession(connectionId);
   }
 });
 ```
@@ -416,7 +417,7 @@ Subscribes a callback that executes when the CCP initialization is completed.
   .then(function(devices) { /* ... */ })
   .catch(function(err) { /* ... */ })
 ```
-Returns a promise that is resolved with the list of media devices from iframe. 
+Returns a promise that is resolved with the list of media devices from iframe.
 Timeout for the request can be passed as an optional argument. The default timeout is 1000ms.
 The API should be called after the iframe CCP initialization is complete.
 
@@ -462,7 +463,7 @@ Subscribe a method to be called when the WebSocket connection fails to initializ
 If the WebSocket has already failed at least once in initializing, the call is
 synchronous and the callback is invoked immediately.  Otherwise, the callback is
 invoked once the first attempt to initialize fails. Since the WebSocket connection
-will be periodically refreshed as needed, the callback will also be invoked 
+will be periodically refreshed as needed, the callback will also be invoked
 if the WebSocket connection fails to re-initialize successfully.
 
 ## Agent API
@@ -492,7 +493,7 @@ Subscribe a method to be called when the agent's state changes. The
 agent.onRoutable(function(agent) { /* ... */ });
 ```
 Subscribe a method to be called when the agent becomes routable, meaning
-that they can be routed incoming contacts. 
+that they can be routed incoming contacts.
 
 ### `agent.onNotRoutable()`
 ```js
@@ -699,7 +700,7 @@ Subscribe a method to be called when an agent has enqueued a next status.
 ```js
 var state = agent.getNextState();
 
-Get the AgentState object of the agent's enqueued next status. 
+Get the AgentState object of the agent's enqueued next status.
 If the agent has not enqueued a next status, returns null.
 ```
 
@@ -887,11 +888,11 @@ Subscribe a method to be invoked when the contact is connected.
 ```js
 contact.onError(function(contact) { /* ... */ });
 ```
-Subscribe a method to be invoked when `connect.ContactEvents.ERROR` happens. 
-This event happens when the *contact* state type is `error`. This is a new change as of version 1.7.6, this api used to not function at all due to the manner in which we were launching contact events. 
+Subscribe a method to be invoked when `connect.ContactEvents.ERROR` happens.
+This event happens when the *contact* state type is `error`. This is a new change as of version 1.7.6, this api used to not function at all due to the manner in which we were launching contact events.
 
 **NOTE**
-This description used to read "This event happens when the *agent* state type is `error`. 
+This description used to read "This event happens when the *agent* state type is `error`.
 The agent state type description was never accurate, as the event was never triggered, even though the source code's intention was to trigger the event on an error agent state type.
 
 ### `contact.getEventName()`
@@ -1061,7 +1062,7 @@ contact.clear({
 });
 ```
 This is a more generic form of `contact.complete()`. Use this for voice, chat, and task contacts to clear the contact
-when the contact is no longer actively being worked on (i.e. it's one of ERROR, ACW, MISSED, REJECTED). 
+when the contact is no longer actively being worked on (i.e. it's one of ERROR, ACW, MISSED, REJECTED).
 It works for both monitoring and non-monitoring connections.
 
 Optional success and failure callbacks can be provided to determine if the operation was successful.
@@ -1259,7 +1260,7 @@ Determine if the contact is active. The connection is active it is incoming, con
 if (conn.isConnected()) { /* ... */ }
 ```
 Determine if the connection is connected, meaning that the agent is live in a conversation through this connection.
-   
+
 Note that, in the case of Agent A transferring a contact to Agent B, the new (third party) agent connection will be marked as `connected` (`connection.isConnected` will return true) as soon as the contact is routed to Agent B's queue, not when Agent B actually is "live" and able to communicate in the conversation.
 
 ### `connection.isConnecting()`
@@ -1683,7 +1684,7 @@ In addition, it is recommended to remove the auth token cookies (`lily-auth-*`) 
 
 *Note that if you are only using CCP, please follow [these directions](#initialization)*
 
-Initializing the Streams API is the first step to verify that you have everything set up correctly and that you are able to listen for events. 
+Initializing the Streams API is the first step to verify that you have everything set up correctly and that you are able to listen for events.
 To get latest streams file and allowlist required urls follow [these instructions](#getting-started)*
 
 ### `connect.agentApp.initApp(name, containerId, appUrl, config)`
@@ -1706,20 +1707,20 @@ To get latest streams file and allowlist required urls follow [these instruction
       function init() {
         const connectUrl = "https://my-instance-domain.awsapps.com/connect";
         connect.agentApp.initApp(
-            "ccp", 
-            "ccp-container", 
+            "ccp",
+            "ccp-container",
             connectUrl + "/ccp-v2/",
             { style: "width:400px; height:600px;" }
         );
         connect.agentApp.initApp(
-            "customerprofiles", 
-            "customerprofiles-container", 
+            "customerprofiles",
+            "customerprofiles-container",
             connectUrl + "/customerprofiles-v2/",
             { style: "width:400px; height:600px;" }
         );
         connect.agentApp.initApp(
-            "wisdom", 
-            "wisdom-container", 
+            "wisdom",
+            "wisdom-container",
             connectUrl + "/wisdom-v2/",
             { style: "width:400px; height:600px;" }
         );
@@ -1776,7 +1777,7 @@ voiceConnection.getVoiceIdSpeakerStatus()
 
 
 ### `voiceConnection.enrollSpeakerInVoiceId(callbackOnAudioCollectionComplete)`
-Enrolls a customer in Voice ID. The enrollment process completes once the backend has collected enough speech data (30 seconds of net customer's audio). If after 10 minutes the process hasn't completed, the method will throw a timeout error. If you call this API for a customer who is already enrolled, it will re-enroll the customer by collecting new speech data and registering a new digital voiceprint. Enrollment can happen only once in a voice contact.   
+Enrolls a customer in Voice ID. The enrollment process completes once the backend has collected enough speech data (30 seconds of net customer's audio). If after 10 minutes the process hasn't completed, the method will throw a timeout error. If you call this API for a customer who is already enrolled, it will re-enroll the customer by collecting new speech data and registering a new digital voiceprint. Enrollment can happen only once in a voice contact.
 You can pass in a callback (optional) that will be invoked when our backend has collected sufficient audio for our backend service to create the new voiceprint.
 
 ```js
@@ -1785,7 +1786,7 @@ const callbackOnAudioCollectionComplete = (data) => {
     `Now sufficient audio has been collected and
     the customer no longer needs to keep talking.
     The backend service is creating the voiceprint with the audio collected`
-  ); 
+  );
 };
 
 voiceConnection.enrollSpeakerInVoiceId(callbackOnAudioCollectionComplete)

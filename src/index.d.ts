@@ -96,7 +96,7 @@ declare namespace connect {
 
     /**
      * Subscribes a callback function to be called when the connect.EventType.IFRAME_RETRIES_EXHAUSTED event is triggered.
-     * 
+     *
      * @param f The callback function.
      */
     onIframeRetriesExhausted(f: Function): void;
@@ -104,18 +104,18 @@ declare namespace connect {
     /**
      * Subscribes a callback function to be called when multiple authorization-type CTI API failures have happened.
      * After this event occurs, streams will not try to re-authenticate the user when more CTI API authorization-type (401) failures happen.
-     * Note that CTI APIs are the agent, contact, and connection apis (specifically, those listed under the `connect.ClientMethods` enum). 
+     * Note that CTI APIs are the agent, contact, and connection apis (specifically, those listed under the `connect.ClientMethods` enum).
      * Therefore, it may be prudent to indicate to the agent that there is a problem related to authorization.
-     * 
+     *
      * @param f The callback function.
      */
     onCTIAuthorizeRetriesExhausted(f: Function): void;
 
     /**
      * Subscribes a callback function to be called when multiple agent authorization api failures have happened.
-     * After this event occurs, streams will not try to redirect the user to login when more agent authorization api failures happen. 
+     * After this event occurs, streams will not try to redirect the user to login when more agent authorization api failures happen.
      * Therefore, it may be prudent to indicate to the agent that there is a problem related to authorization.
-     * 
+     *
      * @param f The callback function.
      */
     onAuthorizeRetriesExhausted(f: Function): void;
@@ -178,7 +178,7 @@ declare namespace connect {
 
     /**
      * Global upstream conduit for external use.
-     * 
+     *
      */
     upstream?: object | null;
   }
@@ -392,6 +392,36 @@ declare namespace connect {
 
     /** Allows you to configure which configuration sections are displayed in the settings tab.  **/
     readonly pageOptions?: PageOptions;
+
+    /**
+     * A timeout in ms that indicates how long streams will wait to send a new SYNCHRONIZE event to the iframed CCP.
+     * These happen continuously from the first time initCCP is called.
+     *
+     * @default 1000
+     */
+     readonly ccpSynTimeout?: number;
+
+     /**
+      * A timeout in ms that indicates how long streams will wait for the iframed CCP to respond to its SYNCHRONIZE event emissions.
+      * These happen continuously from the first time initCCP is called. They should only appear when there is a problem that requires a refresh or a re-login.
+      *
+      * @default 3000
+      */
+     readonly ccpAckTimeout?: number;
+
+     /**
+      * A timeout in ms that indicates how long streams will wait for the initial ACKNOWLEDGE event from the shared worker while the CCP is still standing itself up.
+      *
+      * @default 5000
+      */
+     readonly ccpLoadTimeout?: number;
+
+     /**
+      * A timeout in ms that indicates how long streams will wait between iFrame reloads.
+      *
+      * @default 5000
+      */
+     readonly ccpIframeRefreshInterval?: number;
   }
 
 
@@ -757,12 +787,11 @@ declare namespace connect {
     /** Alias for `getState()`. */
     getStatus(): AgentState;
 
-    /** 
-     * Get the AgentState object of the agent's enqueued next status. 
+    /**
+     * Get the AgentState object of the agent's enqueued next status.
      * If the agent has not enqueued a next status, returns null.
      */
     getNextState(): AgentState;
-
 
     /**
      * Get the duration of the agent's state in milliseconds relative to local time.
@@ -1219,9 +1248,9 @@ declare namespace connect {
     onConnected(callback: ContactCallback): void;
 
     /**
-     * Subscribe a method to be invoked when the contact error event is triggered. 
+     * Subscribe a method to be invoked when the contact error event is triggered.
      * This event is only triggered when a contact state of type error appears in the snapshot.
-     * 
+     *
      * @param callback A callback to receive the `Contact` API object instance.
      */
     onError(callback: ContactCallback): void;

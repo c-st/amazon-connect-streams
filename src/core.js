@@ -1042,7 +1042,9 @@
   connect.core._refreshIframeOnTimeout = function(initCCPParams, containerDiv) {
     connect.assertNotNull(initCCPParams, 'initCCPParams');
     connect.assertNotNull(containerDiv, 'containerDiv');
-    var ccpIframeRefreshInterval = (initCCPParams.disasterRecoveryOn) ? CCP_DR_IFRAME_REFRESH_INTERVAL : CCP_IFRAME_REFRESH_INTERVAL;
+    var ccpIframeRefreshInterval = (initCCPParams.disasterRecoveryOn)
+      ? CCP_DR_IFRAME_REFRESH_INTERVAL
+      : (initCCPParams.ccpIframeRefreshInterval ?? CCP_IFRAME_REFRESH_INTERVAL);
     var retryDelay = AWS.util.calculateRetryDelay((connect.core.iframeRefreshAttempt - 1 || 0), { base: 2000 });
     // Evaluates to 0 for 0th attempt and 1 for rest (>0) of the refresh attempts
     var timeoutFactor = Math.ceil((connect.core.iframeRefreshAttempt || 0) / CCP_IFRAME_REFRESH_LIMIT);
