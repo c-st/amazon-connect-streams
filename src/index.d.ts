@@ -63,6 +63,11 @@ declare namespace connect {
   type ViewContactCallback = (contact: ViewContactEvent) => void;
 
   /**
+   * A callback with no arguments.
+   */ 
+  type Callback = () => void;
+
+  /**
    * Subscribe a method to be called for each newly detected agent contact.
    * Note that this function is not only for incoming contacts, but for contacts which already existed when Streams was initialized, such as from a previous agent session.
    * This callback is provided with a `Contact` API object for this contact. `Contact` API objects can also be listed from the `Agent` API by calling `agent.getContacts()`.
@@ -70,6 +75,16 @@ declare namespace connect {
    * @param callback A callback that will receive an `Contact` API object instance.
    */
   function contact(callback: ContactCallback): void;
+
+  /**
+   * Subscribe a method to be called when the WebSocket connection fails to initialize.
+   * If the WebSocket has already failed at least once in initializing, the call is
+   * synchronous and the callback is invoked immediately.  Otherwise, the callback is
+   * invoked once the first attempt to initialize fails.
+   * 
+   * @param callback A callback with no arguments
+   */
+  function onWebsocketInitFailure(callback: Callback): void;
 
   /**
    * A useful utility function for creating callback closures that bind a function to an object instance.
@@ -390,7 +405,7 @@ declare namespace connect {
      */
     readonly iframeTitle?: string;
 
-    /** Allows you to configure which configuration sections are displayed in the settings tab.  **/
+    /** Allows you to configure which configuration sections are displayed in the settings tab. **/
     readonly pageOptions?: PageOptions;
 
     /**
@@ -463,6 +478,15 @@ declare namespace connect {
 
     /** Allows you to configure which configuration sections are displayed in the settings tab. */
     readonly pageOptions?: PageOptions;
+
+    /** A timeout in ms that indicates how long streams will wait for the iframed CCP to respond to its SYNCHRONIZE event emissions. These happen continuously from the first time initCCP is called. They should only appear when there is a problem that requires a refresh or a re-login */
+    readonly ccpAckTimeout?: number;
+
+    /** A timeout in ms that indicates how long streams will wait to send a new SYNCHRONIZE event to the iframed CCP. These happens continuously from the first time initCCP is called. */
+    readonly ccpSynTimeout?: number;
+
+    /** A timeout in ms that indicates how long streams will wait for the initial ACKNOWLEDGE event from the shared worker while the CCP is still standing itself up. */
+    readonly ccpLoadTimeout?: number;
   }
 
   /** This enumeration lists the different types of agent states. */
@@ -505,6 +529,26 @@ declare namespace connect {
     MISSED_CALL_CUSTOMER = "MissedCallCustomer",
     MULTIPLE_CCP_WINDOWS = "MultipleCcpWindows",
     REALTIME_COMMUNICATION_ERROR = "RealtimeCommunicationError",
+  }
+
+  enum AgentEvents {
+    INIT = 'init',
+    UPDATE = 'update',
+    REFRESH = 'refresh',
+    ROUTABLE = 'routable',
+    NOT_ROUTABLE = 'not_routable',
+    PENDING = 'pending',
+    CONTACT_PENDING = 'contact_pending',
+    OFFLINE = 'offline',
+    ERROR = 'error',
+    SOFTPHONE_ERROR = 'softphone_error',
+    WEBSOCKET_CONNECTION_LOST = 'websocket_connection_lost',
+    WEBSOCKET_CONNECTION_GAINED = 'websocket_connection_gained',
+    STATE_CHANGE = 'state_change',
+    ACW = 'acw',
+    MUTE_TOGGLE = 'mute_toggle',
+    LOCAL_MEDIA_STREAM_CREATED = 'local_media_stream_created',
+    ENQUEUED_NEXT_STATE = 'enqueued_next_state',
   }
 
   /** This enumeration lists the different types of endpoints. */
@@ -554,6 +598,12 @@ declare namespace connect {
 
     /** The connection is no longer connected to the contact. */
     DISCONNECTED = "disconnected",
+
+    /** The connection is in silent monitor mode */
+    SILENT_MONITOR = "silent_monitor",
+
+    /** The connection is in barge mode */
+    BARGE = "barge"
   }
 
   enum ContactEvents {
@@ -607,6 +657,12 @@ declare namespace connect {
 
     /** Indicates the contact has ended. */
     ENDED = "ended",
+
+    /** Indicates the contact acw. */
+    ACW = "acw",
+
+    /** Indicates the contact has cleared. */
+    CLEARED = "cleared",
   }
 
   enum CONTACT_ACTIVE_STATES {
@@ -690,6 +746,14 @@ declare namespace connect {
     UNAUTHORIZED_EXCEPTION = "UnauthorizedException",
   }
 
+  enum MasterTopics {
+    LOGIN_POPUP = 'loginPopup',
+    SEND_LOGS = 'sendLogs',
+    SOFTPHONE = 'softphone',
+    RINGTONE = 'ringtone',
+    METRICS = 'metrics',
+  }
+
   /*
    * A callback to receive notifications of success or failure.
    */
@@ -764,6 +828,20 @@ declare namespace connect {
     onError(callback: AgentCallback): void;
 
     /**
+     * Subscribe a method to be called when the agent is put into an error state specific to losing a WebSocket connection.
+     *
+     * @param callback A callback to receive the `Agent` API object instance.
+     */
+    onWebSocketConnectionLost(callback: AgentCallback): void;
+
+    /**
+     * Subscribe a method to be called when the agent gains a WebSocket connection.
+     *
+     * @param callback A callback to receive the `Agent` API object instance.
+     */
+    onWebSocketConnectionGained(callback: AgentCallback): void;
+
+    /**
      * Subscribe a method to be called when the agent is put into an error state specific to softphone funcionality.
      *
      * @param callback A callback to receive the `SoftphoneError` error.
@@ -777,6 +855,13 @@ declare namespace connect {
      * @param callback A callback to receive the `Agent` API object instance.
      */
     onAfterCallWork(callback: AgentCallback): void;
+
+    /** 
+     * Subscribe a method to be called when the agent is put into an error state specific to losing a WebSocket connection.
+     * 
+     * @param callback A callback to receive the `Agent` API object instance.
+     */
+    onWebSocketConnectionLost(callback: AgentCallback): void;
 
     /** Get the agent's current 'AgentAvailabilityState' object indicating their actual state type. */
     getAvailabilityState(): AgentAvailabilityState;
@@ -1609,13 +1694,13 @@ declare namespace connect {
     optOutVoiceIdSpeaker(): Promise<any>;
 
     /** Returns VoiceId speaker authentication status */
-    evaluateSpeakerWithVoiceId(): Promise<any>;
+    evaluateSpeakerWithVoiceId(startNewSession?: boolean): Promise<any>;
 
     /** Enroll speaker into VoiceId */
-    enrollSpeakerInVoiceId(): Promise<any>;
+    enrollSpeakerInVoiceId(callbackOnAudioCollectionComplete?: Function): Promise<any>;
 
     /** Update speaker id */
-    updateVoiceIdSpeakerId(): Promise<any>;
+    updateVoiceIdSpeakerId(speakerId: string): Promise<any>;
 
     /** Delete speaker id */
     deleteVoiceIdSpeakerId(): Promise<any>;
@@ -1732,6 +1817,17 @@ declare namespace connect {
     readonly joinTime: Date;
   }
 
+  enum LogLevel {
+    TEST = "TEST",
+    TRACE = "TRACE",
+    DEBUG = "DEBUG",
+    INFO = "INFO",
+    LOG = "LOG",
+    WARN = "WARN",
+    ERROR = "ERROR",
+    CRITICAL = "CRITICAL",
+  }
+
   /**
    * The Streams library comes with a logging utility that can be used to easily gather logs and provide them for diagnostic purposes.
    * You can even add your own logs to this logger if you prefer.
@@ -1768,6 +1864,20 @@ declare namespace connect {
 
     /** Downloads the logs on the agent's machine in JSON form. */
     download(): void;
+
+    /**
+     * Set the log level.  This is the minimum level at which logs will
+     * be kept for later archiving.
+     * @param level The log level.
+     */
+    setLogLevel(level: LogLevel): void;
+
+    /**
+     * Set the echo level.  This is the minimum level at which logs will
+     * be printed to the javascript console.
+     * @param level The log level.
+     */
+    setEchoLevel(level: LogLevel): void;
   }
 
   /** Allows to add additional information to a log entry. */

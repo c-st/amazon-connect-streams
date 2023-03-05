@@ -18,8 +18,15 @@ Run `npm run release` to generate new release files. Full instructions for build
 In version 1.x, we also support `make` for legacy builds. This option was removed in version 2.x.
 
 # Important Announcements
+1. December 2022 - In addition to the CCP, customers can now embed the Step-by-step guides application using the connect.agentApp. See the [updated documentation](https://github.com/amazon-connect/amazon-connect-streams/blob/master/Documentation.md#initialization-for-ccp-customer-profiles-wisdom-and-step-by-step-guides) for details on usage. 
+    * ### About Amazon Connect Step-by-step guides 
+      + With Amazon Connect you can now create guides that walk agents through tailored views that focus on what must be seen or done by the agent at a given moment during an interaction. You can design workflows for various types of customer interactions and present agents with different step-by-step guides based on context, such as call queue, customer information, and interactive voice response (IVR). This feature is available in the Connect agent workspace as well as an embeddable application that can be embedded into another website via the Streams API. For more information, visit the AWS website: https://aws.amazon.com/connect/agent-workspace/
+1. December 2022 - 2.4.2
+    * This patch fixes an issue in Streams’ Voice ID APIs that may have led to incorrect values being set against the generatedSpeakerID field in the VoiceIdResult segment of Connect Contact Trace Records (CTRs). This occurred in some scenarios where you call either enrollSpeakerInVoiceId(), evaluateSpeakerWithVoiceId(), or updateVoiceIdSpeakerId() in your custom CCP integration code. If you are using Voice ID and consuming Voice ID CTRs, or updating speaker ID in your agent workflow, please upgrade to this version.
+1. December 2022 - 2.4.1
+    * This version brings in updates that will provide enhanced monitoring experience to agents and supervisors, allowing to silently monitor multiparty calls, and if needed to barge in the call and take over control, mute agents, or drop them from the call. New APIs introduced with this feature are `isSilentMonitor`, `isBarge`, `isSilentMonitorEnabled`, `isBargeEnabled`, `isUnderSupervision`, `updateMonitorParticipantState`, `getMonitorCapabilities`, `getMonitorStatus`, `isForcedMute`.
 1. August 2022 - 2.3.0
-    * This patch fixes an issue in Streams’ Voice ID APIs that may have led to incorrect values being set against the generatedSpeakerID field in the VoiceIdResult segment of Connect Contact Trace Records (CTRs). This occurred in some scenarios where you call either enrollSpeakerInVoiceId(), evaluateSpeakerWithVoiceId(), or updateVoiceIdSpeakerId() in your custom CCP integration code. If you are using Voice ID and consuming Voice ID CTRs, please upgrade to this version.
+    * [Update on 12/13/2022] Please see 2.4.2 for final resolution of the Voice ID CTR fix.
 1. Jan 2022 - 2.0.0
     * Multiple calls to `initCCP` will no longer append multiple embedded CCPs to the window, and only the first call to `initCCP` will succeed. Please note that the use-case of initializing multiple CCPs with `initCCP` has never been supported by Streams, and this change has been added to prevent unpredictable behavior arising from such cases.
     * `agent.onContactPending` has been removed. Please use `contact.onPending` instead. `connect.onError` now triggers. Previously, this api did not work at all. Please be aware that, if you have application logic within this function, its behavior has changed. See its entry in documentation.md for more details.
@@ -40,7 +47,7 @@ In version 1.x, we also support `make` for legacy builds. This option was remove
     * `FailedConnectAgent` -- Previously, we required the agent to click the "Clear Contact" button to clear this state. When the agent clicked the "Clear Contact" button, the previous behavior took the agent back to the `Available` state without fail. Now the `FailedConnectAgent` state will be "auto-cleared", much like `FailedConnectCustomer` always has been.
     * `FailedConnectAgent` and `FailedConnectCustomer` -- We are now using the `contact.clear()` API to auto-clear these states. As a result, the agent will be returned to their previous visible agent state (e.g. `Available`). Previously, the agent had always been set to `Available` as a result of this "auto-clearing" behavior. Note that even custom CCPs will behave differently with this update for `FailedConnectAgent` and `FailedConnectCustomer`.
     * `AfterCallWork` -- As part of the new `contact.clear()` behavior, clicking "Clear Contact" while in `AfterCallWork` will return the agent to their previous visible agent state (e.g. `Available`, etc.). Note that custom CCPs that implement their own After Call Work behavior will not be affected by this change.
-        * We are putting `contact.complete()` on a deprecation path. Therefore, you should start using `contact.clear()` in its place. If you want to emulate CCP's After Call Work behavior in your customer CCP, then make sure you use `contact.clear()` when clearing voice contacts.
+        * We are putting `contact.complete()` on a deprecation path. Therefore, you should start using `contact.clear()` in its place. If you want to emulate CCP's After Call Work behavior in your customer CCP, then make sure you use `contact.clear()` when clearing voice contacts. 
 
 ## Getting Started
 
@@ -169,7 +176,7 @@ everything setup correctly and that you will be able to listen for events.
     <div id="container-div" style="width: 400px; height: 800px;"></div>
     <script type="text/javascript">
       var containerDiv = document.getElementById("container-div");
-      var instanceURL = "https://my-instance-domain.awsapps.com/connect/ccp-v2/";
+      var instanceURL = "https://my-instance-domain.my.connect.aws/ccp-v2/";
       // initialize the streams api
       function init() {
         // initialize the ccp
@@ -241,7 +248,7 @@ and made available to your JS client code.
   * `disableRingtone`: This option allows you to completely disable the built-in
     ringtone audio that is played when a call is incoming.
   * `ringtoneUrl`: If the ringtone is not disabled, this allows for overriding
-    the ringtone with any browser-supported audio file accessible by the user.
+    the ringtone with any browser-supported audio file accessible by the user. To use the default ringtone comment out this line.
 * `pageOptions`: This object is optional and allows you to configure which configuration sections are displayed in the settings tab.
   * `enableAudioDeviceSettings`: If `true`, the settings tab will display a section for configuring audio input and output devices for the agent's local
       machine. If `false`, or if `pageOptions` is not provided, the agent will not be able to change audio device settings from the settings tab. will not be

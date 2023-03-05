@@ -12,8 +12,15 @@ Run `npm run release` to generate new release files. Full instructions for build
 In version 1.x, we also support `make` for legacy builds. This option was removed in version 2.x.
 
 # Important Announcements
+1. December 2022 - In addition to the CCP, customers can now embed the Step-by-step guides application using the connect.agentApp. See the [updated documentation](https://github.com/amazon-connect/amazon-connect-streams/blob/master/Documentation.md#initialization-for-ccp-customer-profiles-wisdom-and-step-by-step-guides) for details on usage. 
+    * ### About Amazon Connect Step-by-step guides 
+      + With Amazon Connect you can now create guides that walk agents through tailored views that focus on what must be seen or done by the agent at a given moment during an interaction. You can design workflows for various types of customer interactions and present agents with different step-by-step guides based on context, such as call queue, customer information, and interactive voice response (IVR). This feature is available in the Connect agent workspace as well as an embeddable application that can be embedded into another website via the Streams API. For more information, visit the AWS website: https://aws.amazon.com/connect/agent-workspace/
+1. December 2022 - 2.4.2
+    * This patch fixes an issue in Streams’ Voice ID APIs that may have led to incorrect values being set against the generatedSpeakerID field in the VoiceIdResult segment of Connect Contact Trace Records (CTRs). This occurred in some scenarios where you call either enrollSpeakerInVoiceId(), evaluateSpeakerWithVoiceId(), or updateVoiceIdSpeakerId() in your custom CCP integration code. If you are using Voice ID and consuming Voice ID CTRs, or updating speaker ID in your agent workflow, please upgrade to this version.
+1. December 2022 - 2.4.1
+    * This version brings in updates that will provide enhanced monitoring experience to agents and supervisors, allowing to silently monitor multiparty calls, and if needed to barge in the call and take over control, mute agents, or drop them from the call. New APIs introduced with this feature are `isSilentMonitor`, `isBarge`, `isSilentMonitorEnabled`, `isBargeEnabled`, `isUnderSupervision`, `updateMonitorParticipantState`, `getMonitorCapabilities`, `getMonitorStatus`, `isForcedMute`.
 1. August 2022 - 2.3.0
-    * This patch fixes an issue in Streams’ Voice ID APIs that may have led to incorrect values being set against the generatedSpeakerID field in the VoiceIdResult segment of Connect Contact Trace Records (CTRs). This occurred in some scenarios where you call either enrollSpeakerInVoiceId(), evaluateSpeakerWithVoiceId(), or updateVoiceIdSpeakerId() in your custom CCP integration code. If you are using Voice ID and consuming Voice ID CTRs, please upgrade to this version.
+    * [Update on 12/13/2022] Please see 2.4.2 for final resolution of the Voice ID CTR fix.
 1. Jan 2022 - 2.0.0
     * Multiple calls to `initCCP` will no longer append multiple embedded CCPs to the window, and only the first call to `initCCP` will succeed. Please note that the use-case of initializing multiple CCPs has never been supported by Streams, and this change has been added to prevent unpredictable behavior arising from such cases.
     * `agent.onContactPending` has been removed. Please use `contact.onPending` instead. `connect.onError` now triggers. Previously, this api did not work at all. Please be aware that, if you have application logic within this function, its behavior has changed. See its entry in documentation.md for more details.
@@ -286,7 +293,58 @@ this:
 * If you are using task functionalities you must include [TaskJS](https://github.com/amazon-connect/amazon-connect-taskjs). TaskJS should be imported after Streams.
 * If you'd like access to the WebRTC session to further customize the softphone experience
   you can use [connect-rtc-js](https://github.com/aws/connect-rtc-js). Please refer to the connect-rtc-js readme for detailed instructions on integrating connect-rtc-js with Streams.
-* `initCCP` **should not be used to embed multiple CCPs** as this causes unpredictable behavior. In version 2.0 a check has been added to automatically prevent subsequent invocations of `initCCP` from embedding additional CCPs.
+* `initCCP` **should not be used to embed multiple CCPs in the same browser context** as this causes unpredictable behavior. In version 2.0 a check has been added to automatically prevent subsequent invocations of `initCCP` from embedding additional CCPs.
+  * It is possible to embed multiple CCPs in the same page if they are associated with different Connect instances and are being embedded in different browser contexts, such that their Window objects are different (e.g. in different iframes). You won't be able to embed multiple CCPs under the same Window object or invoke `initCCP` multiple times in the same browser context.
+  * Instead of loading Streams once for the whole page, you'll need to load Streams separately in each iframe, and invoke `initCCP` separately in each.
+  * Once the iframes finish loading, you can then use the `contentWindow.connect` property on each iframe to access its Streams object and make API calls to the specific CCP embedded inside. As an example of embedding CCPs twice on the same page for two Connect instances, A and B:
+
+```js
+var frameA = document.createElement('iframe');
+var frameB = document.createElement('iframe');
+var contentDocumentA = [
+       "<!DOCTYPE html>",
+       "<meta charset='UTF-8'>",
+       "<html>",
+         "<head>",
+           "<script type='text/javascript' src='https://cdn.jsdelivr.net/npm/amazon-connect-streams/release/connect-streams-min.js'>",
+           "</script>",
+         "</head>",
+         "<body onload='init()' style='width:400px;height:800px'>",
+           "<div id=containerDiv style='width:100%;height:100%'></div>",
+           "<script type='text/javascript'>",
+             "function init() {",
+               "connect.core.initCCP(containerDiv, <initCCP parameters for instance A>);",
+            "}",
+           "</script>",
+         "</body>",
+       "</html>"
+     ].join('');
+var contentDocumentB = ...; // same as above, but with initCCP parameters for instance B
+frameA.srcdoc = contentDocumentA;
+frameB.srcdoc = contentDocumentB;
+[frameA, frameB].forEach((frame) => {
+  frame.allow = "microphone; autoplay; clipboard-write";
+  frame.style = "width:400px;height:800px;margin:0;border:0;padding:0px;";
+  frame.scrolling = "no";
+  document.documentElement.append(frame); // You can append the frames wherever you need each CCP to appear.
+});
+
+// Wait for iframes to load, then contentWindow.connect will be set to each frame's Streams object.
+// Until the iframes have finished loading Streams, contentWindow.connect will be undefined
+var connectA = frameA.contentWindow.connect;
+var connectB = frameB.contentWindow.connect;
+
+connectA.contact(function(contact) { /* ... */ });
+```
+
+### How can I determine that the agent is logged out or that their session has expired?
+* You can use `connect.core.onAuthFail()` to subscribe a callback function that will be called if the agent was unable to authenticate to Connect using the credentials set in their browser (if any), so you can present a button or popup for the agent to log back in or start a new session.
+```js
+connect.core.onAuthFail(function(){
+  // agent logged out or session expired.  needs login
+  // show button for login or popup a login screen. 
+});
+```
 
 ## `connect.core`
 
@@ -850,7 +908,7 @@ Subscribe a method to be invoked when the contact is connecting. This event happ
 ```js
 contact.onAccepted(function(contact) { /* ... */ });
 ```
-Subscribe a method to be invoked whenever the contact is accepted. Please note that event doesn't fire for contacts that are auto-accepted.
+Subscribe a method to be invoked whenever the contact is accepted. Please note that event doesn't fire for contacts that are auto-accepted, or for agents using a deskphone.
 
 ### `contact.onMissed()`
 ```js
@@ -1007,6 +1065,8 @@ participation in the contact.
 var attributeMap = contact.getAttributes(); // e.g. { "foo": { "name": "foo", "value": "bar" } }
 ```
 Gets a map of the attributes associated with the contact. Each value in the map has the following shape: `{ name: string, value: string }`.
+
+Please note that this api method will return null when the current user is monitoring the contact, rather than being an active participant in the contact.
 
 ### `contact.isSoftphoneCall()`
 ```js
@@ -1259,8 +1319,8 @@ Determine if the contact is active. The connection is active it is incoming, con
 ```js
 if (conn.isConnected()) { /* ... */ }
 ```
-Determine if the connection is connected, meaning that the agent is live in a conversation through this connection.
-
+Determine if the connection is connected, meaning that the agent is live in a conversation through this connection. Please note that `ConnectionStateType.SILENT_MONITOR` and `ConnectionStateType.BARGE` are considered connected as well.
+   
 Note that, in the case of Agent A transferring a contact to Agent B, the new (third party) agent connection will be marked as `connected` (`connection.isConnected` will return true) as soon as the contact is routed to Agent B's queue, not when Agent B actually is "live" and able to communicate in the conversation.
 
 ### `connection.isConnecting()`
@@ -1372,7 +1432,12 @@ conn.muteParticipant({
    failure: function(err) { /* ... */ }
 });
 ```
-Mute the connection server side.
+Mute the connection server side. 
+#### Multiparty call
+Any agent participant can mute another agent participant. 
+
+#### Supervisor barges into the call
+Agents can mute themselves, but cannot mute other agents or supervisor.  
 
 Optional success and failure callbacks can be provided to determine if the operation was successful.
 
@@ -1383,7 +1448,12 @@ conn.unmuteParticipant({
    failure: function(err) { /* ... */ }
 });
 ```
-Unmute the connection server side.
+Unmute the connection server side. 
+#### Multiparty call 
+Any agent can only unmute themselves.
+
+#### Supervisor barges into the call
+Agents can only unmute themselves up until the point they have been muted by the supervisor (isForcedMute API can help checking that). Once they have been muted by the supervisor, agent cannot unmute themselves until supervisor unmutes agent (at which point agent will regain ability to mute and unmute themselves). If supervisor has muted but not unmuted agent then drops from call, agent will be able to unmute themselves once supervisor has dropped.
 
 Optional success and failure callbacks can be provided to determine if the operation was successful.
 
@@ -1500,6 +1570,16 @@ Lists the different types of connections.
 * `ConnectionType.OUTBOUND`: An outbound connection, representing either an outbound call or additional connection added to the contact.
 * `ConnectionType.MONITORING`: A special connection type representing a manager listen-in session.
 
+###  `MonitoringMode`
+Lists the different monitoring modes representing a manager listen-in session.
+
+* `MonitoringMode.SILENT_MONITOR`: An enhanced listen-in manager session
+* `MonitoringMode.BARGE`: A special manager session mode with full control over contact actions
+
+### `MonitoringErrorTypes`
+Lists the different monitoring error states.
+* `MonitoringErrorTypes.INVALID_TARGET_STATE`: Indicates that invalid target state has been passed
+
 ### `ContactStateType`
 An enumeration listing the different high-level states that a contact can have.
 
@@ -1520,6 +1600,8 @@ An enumeration listing the different states that a connection can have.
 * `ConnectionStateType.CONNECTED`: The connection is connected to the contact.
 * `ConnectionStateType.HOLD`: The connection is connected but on hold.
 * `ConnectionStateType.DISCONNECTED`: The connection is no longer connected to the contact.
+* `ConnectionStateType.SILENT_MONITOR`: An enhanced listen-in manager session, this state is used instead of `ContactStateType.CONNECTED` for manager
+* `ContactStateType.BARGE`: A special manager session mode with full control over contact actions, this state is used instead of `ContactStateType.CONNECTED` for manager
 
 ### `ContactType`
 This enumeration lists all of the contact types supported by Connect Streams.
@@ -1680,7 +1762,7 @@ fetch("https://<your-instance-domain>/connect/logout", { credentials: 'include',
   });
 ```
 In addition, it is recommended to remove the auth token cookies (`lily-auth-*`) after logging out, otherwise you’ll see AuthFail errors. ([Browser API Reference](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/cookies/remove)).
-## Initialization for CCP, Customer Profiles, and Wisdom
+## Initialization for CCP, Customer Profiles, Wisdom, and Step-by-step guides
 
 *Note that if you are only using CCP, please follow [these directions](#initialization)*
 
@@ -1698,10 +1780,11 @@ To get latest streams file and allowlist required urls follow [these instruction
   </head>
   <!-- Add the call to init() as an onload so it will only run once the page is loaded -->
   <body onload="init()">
-    <main>
+    <main style="display: flex;">
       <div id="ccp-container"></div>
       <div id="customerprofiles-container"></div>
       <div id="wisdom-container"></div>
+      <div id="stargate-container"></div>
     </main>
     <script type="text/javascript">
       function init() {
@@ -1724,6 +1807,33 @@ To get latest streams file and allowlist required urls follow [these instruction
             connectUrl + "/wisdom-v2/",
             { style: "width:400px; height:600px;" }
         );
+
+        connect.agentApp.initApp(
+            "stargate", 
+            "stargate-container", 
+            connectUrl + "/stargate/app",
+            { style: "width:400px; height:600px;" }
+        );
+        /**
+         * 
+        * Step-by-step guides will not load any view without a contact flow Id. 
+        * You can get the contact flow ID from the contact attribute, DefaultFlowForAgentUI (see [here](https://docs.aws.amazon.com/connect/latest/adminguide/how-to-invoke-a-flow-sg.html) for more details on this particular attribute).
+        * If you want to use information on the current connected contact (voice, chat, or task) to provide context to the step-by-step guide flow, you should add the parameter, currentContactId, at the url.  
+        * For more information, visit the AWS website: https://aws.amazon.com/connect/agent-workspace/
+        *
+        **/
+        connect.contact((contact)=>{
+            contact.onConnected((contact)=>{
+                const currentContactId = contact.contactId;
+                const contactAttributes = contact.getAttributes();
+                if(contactAttributes["DefaultFlowForAgentUI"]) {
+                    const contactflowId = contactAttributes["DefaultFlowForAgentUI"].value;
+                    const stargateIframe = document.querySelector('#stargate-container > iframe');
+                    
+                    stargateIframe.setAttribute('src', `${connectUrl}/stargate/app?contactFlowId=${contactflowId}&currentContactId=${currentContactId}`);
+                }
+            });
+        })
       }
     </script>
   </body>
@@ -1843,7 +1953,6 @@ voiceConnection.evaluateSpeakerWithVoiceId()
   });
 ```
 
-
 ### `voiceConnection.optOutVoiceIdSpeaker()`
 Opts-out a customer from Voice ID. This API can work for the customer who hasn’t enrolled in Voice ID.
 
@@ -1889,10 +1998,120 @@ voiceConnection.deleteVoiceIdSpeaker()
 Updates the speaker ID of the customer with the provided string.
 
 ```js
-voiceConnection.deleteVoiceIdSpeaker()
+voiceConnection.updateVoiceIdSpeaker()
   .then(() => {
   })
   .catch((err) => {
     console.error(err);
   });
+```
+
+## Enhanced Monitoring APIs
+Enhanced monitoring providing real-time silent monitoring and barge capability to help managers and supervisors to listen in the agents' conversations and barge into the call if needed to take over the control and provide better customer experience. Supervisors in barge mode will be able to force mute agents and prevent them from unmuting themselves, will be able to hold, drop any connection, or directly speak with the customer. If the supervisor has muted an agent and then drops from the call, the agent will be able to unmute themselves once supervisor has dropped. Monitoring APIs are expected to be used against agent's(or supervisor's) connection. To start enhanced monitoring supervisor/manager will need to click an eye icon on the Real Time Metrics page.
+
+Streams Enhanced Monitoring APIs can be tested after all these prerequisites are met:
+1. Enable Multi-Party Calls and Enhanced Monitoring in Telephony section of the Amazon Connect Console.
+1. Enable Real-time contact monitoring and Real-time contact barge-in in Security Profiles
+
+### `voiceConnection.isSilentMonitor()`
+```js
+if (conn.isSilentMonitor()) { /* ... */ }
+```
+Returns true if monitorStatus is `MonitoringMode.SILENT_MONITOR`. This means the supervisor connection is in silent monitoring state. Regular agent will not see supervisor's connection in the snapshot while it is in silent monitor state.
+
+### `voiceConnection.isBarge()`
+```js
+if (conn.isBarge()) { /* ... */ }
+```
+Returns true if monitorStatus is `MonitoringMode.BARGE`. This means the connection is in barge-in state. Regular agent will see the supervisor's connection in the list of connections in the snapshot.
+
+### `voiceConnection.isSilentMonitorEnabled()`
+```js
+if (conn.isSilentMonitorEnabled()) { /* ... */ }
+```
+Returns true if agent's monitoringCapabilities contain `MonitoringMode.SILENT_MONITOR` type. 
+
+### `voiceConnection.isBargeEnabled()`
+```js
+if (conn.isBargeEnabled()) { /* ... */ }
+```
+Returns true if agent's monitoringCapabilities contain `MonitoringMode.BARGE` state type.
+
+### `voiceConnection.getMonitorCapabilities()`
+```js
+var allowedMonitorStates = conn.getMonitorCapabilities();
+```
+Returns the array of enabled monitor states of this connection. The array will consist of `MonitoringMode` enum values.
+
+### `voiceConnection.getMonitorStatus()`
+```js
+var monitorState = conn.getMonitorStatus();
+```
+Returns the current monitoring state of this connection. The value can be on of `MonitoringMode` enum values if the agent is supervisor, or the monitorStatus will not be present for the agent.
+
+### `voiceConnection.isForcedMute()`
+```js
+if (conn.isForcedMute()) { /* ... */ }
+```
+Determine whether the connection was forced muted by the manager.
+
+### `contact.updateMonitorParticipantState()`
+```js
+contact.updateMonitorParticipantState(targetState, {
+   success: function() { /* ... */ },
+   failure: function(err) { /* ... */ }
+});
+```
+Updates the monitor participant state to switch between different monitoring modes. The targetState value is a `MonitoringMode` enum member.
+
+### `contact.isUnderSupervision()`
+```js
+if (contact.isUnderSupervision()) { /* ... */ }
+```
+Determines if the contact is under manager's supervision
+
+#### Usage examples
+
+Check that barge is enabled before switching to the barge mode - first we need to make sure that barge is enabled for the supervisor connection, and after that initiate monitor status change on the contact.
+```js
+if(voiceConnection.isBargeEnabled()) {
+  contact.updateMonitorParticipantState(connect.MonitoringMode.BARGE, {
+   success: function() { 
+    console.log("Successfully changed the monitoring status to barge, now you can control the conversation")
+   },
+   failure: function(err) { 
+    console.log("Somenting went wrong, here is the error ", err) 
+   }
+  }); 
+}
+```
+
+Check that silent monitor is enabled before switching to the silent monitor mode - first we need to make sure that silent monitor is enabled for the supervisor connection, and after that initiate monitor status change on the contact.
+```js
+if(voiceConnection.isSilentMonitorEnabled()) {
+  contact.updateMonitorParticipantState(connect.MonitoringMode.SILENT_MONITOR, {
+   success: function() { 
+    console.log("Successfully changed the monitoring status to silent monitor")
+   },
+   failure: function(err) { 
+    console.log("Somenting went wrong, here is the error ", err) 
+   }
+  }); 
+}
+```
+
+After supervisor mutes the agent - force mute field is automatically updated on the agent side. You may want to display a banner or somehow indicate to the agent that he cannot unmute himself back anymore.
+
+```js
+if(voiceConnection.isForcedMute()) {
+  /* Some logic here to indicate forced mute to the agent */
+}
+```
+
+After supervisor barges the call - agent doesn't have control anymore. Agent can only mute or unmute himself until he was forced muted, or leave the call. It will be good to indicate that to ahent as well by hiding or disabling buttons.
+
+```js
+if(voiceConnection.isUnderSupervision()) {
+  /* Some logic here to indicate disabled call controls to the agent */
+}
 ```
